@@ -1,12 +1,12 @@
 import matplotlib
 
-matplotlib.use("QtAgg")
+# matplotlib.use("QtAgg")
 import matplotlib.pyplot as plt  # or "Qt5Agg"
 import mne
 
 troubleshoot_epochs = False
 
-mne.viz.set_browser_backend("qt")
+#mne.viz.set_browser_backend("qt")
 raw = mne.io.read_raw_edf("S001R03.edf", preload=True)
 
 print(raw.info)
