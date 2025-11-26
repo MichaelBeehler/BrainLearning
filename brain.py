@@ -1,16 +1,26 @@
 import matplotlib
-
-# matplotlib.use("QtAgg")
-import matplotlib.pyplot as plt  # or "Qt5Agg"
+# Use Agg backend for non-interactive plotting (saves to files)
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import mne
 import numpy as np
 from mne.decoding import CSP
 from mne.time_frequency import psd_array_welch
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold, LeaveOneOut
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, roc_auc_score, roc_curve
+from sklearn.preprocessing import StandardScaler
 
 troubleshoot_epochs = False
 save_plots = True  # Set to False if you want interactive plots (requires GUI backend)
 
-#mne.viz.set_browser_backend("qt")
+# Try to set browser backend, but fallback gracefully if not available
+try:
+    mne.viz.set_browser_backend("matplotlib")  # Use matplotlib backend instead of qt
+except:
+    print("Note: Using default MNE browser backend")
 raw = mne.io.read_raw_edf("S001R03.edf", preload=True)
 
 print(raw.info)
@@ -579,6 +589,292 @@ if X_features is not None:
                 plt.show()
 
 
+# ============================================================================
+# MACHINE LEARNING CLASSIFICATION
+# ============================================================================
+
+def train_and_evaluate_classifiers(X_features, y, test_size=0.3, random_state=42):
+    """
+    Train and evaluate multiple classifiers on the extracted features.
+    
+    Parameters:
+    -----------
+    X_features : np.array
+        Feature matrix (n_epochs, n_features)
+    y : np.array
+        Class labels
+    test_size : float
+        Proportion of data for testing
+    random_state : int
+        Random seed for reproducibility
+    
+    Returns:
+    --------
+    results : dict
+        Dictionary containing models, scores, and predictions
+    """
+    print("\n" + "="*60)
+    print("MACHINE LEARNING CLASSIFICATION")
+    print("="*60)
+    
+    # Split data into train and test sets
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_features, y, test_size=test_size, random_state=random_state, 
+        stratify=y  # Maintain class balance
+    )
+    
+    print(f"\nTrain set: {X_train.shape[0]} samples, Test set: {X_test.shape[0]} samples")
+    print(f"Train class distribution: {np.bincount(y_train)}")
+    print(f"Test class distribution: {np.bincount(y_test)}")
+    
+    # Standardize features (important for SVM and Logistic Regression)
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+    
+    # Define classifiers
+    classifiers = {
+        'SVM (RBF)': SVC(kernel='rbf', probability=True, random_state=random_state),
+        'SVM (Linear)': SVC(kernel='linear', probability=True, random_state=random_state),
+        'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=10, 
+                                               random_state=random_state, n_jobs=-1),
+        'Logistic Regression': LogisticRegression(max_iter=1000, random_state=random_state, 
+                                                 solver='lbfgs')
+    }
+    
+    results = {
+        'models': {},
+        'scalers': scaler,
+        'train_scores': {},
+        'test_scores': {},
+        'cv_scores': {},
+        'predictions': {},
+        'probabilities': {},
+        'X_train': X_train,
+        'X_test': X_test,
+        'y_train': y_train,
+        'y_test': y_test,
+        'X_train_scaled': X_train_scaled,
+        'X_test_scaled': X_test_scaled
+    }
+    
+    # For small datasets, use Leave-One-Out cross-validation
+    # Otherwise use Stratified K-Fold
+    n_samples = len(y_train)
+    if n_samples < 20:
+        cv = LeaveOneOut()
+        cv_name = "Leave-One-Out"
+    else:
+        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
+        cv_name = "5-Fold Stratified"
+    
+    print(f"\nUsing {cv_name} Cross-Validation")
+    print("-" * 60)
+    
+    # Train and evaluate each classifier
+    for name, clf in classifiers.items():
+        print(f"\nTraining {name}...")
+        
+        # For SVM and Logistic Regression, use scaled data
+        if 'SVM' in name or 'Logistic' in name:
+            X_train_use = X_train_scaled
+            X_test_use = X_test_scaled
+        else:
+            X_train_use = X_train
+            X_test_use = X_test
+        
+        # Train
+        clf.fit(X_train_use, y_train)
+        
+        # Evaluate on training set
+        train_pred = clf.predict(X_train_use)
+        train_acc = accuracy_score(y_train, train_pred)
+        
+        # Evaluate on test set
+        test_pred = clf.predict(X_test_use)
+        test_acc = accuracy_score(y_test, test_pred)
+        
+        # Cross-validation
+        cv_scores = cross_val_score(clf, X_train_use, y_train, cv=cv, scoring='accuracy')
+        
+        # Get probabilities for ROC curve
+        if hasattr(clf, 'predict_proba'):
+            y_proba = clf.predict_proba(X_test_use)[:, 1]
+        else:
+            y_proba = None
+        
+        # Store results
+        results['models'][name] = clf
+        results['train_scores'][name] = train_acc
+        results['test_scores'][name] = test_acc
+        results['cv_scores'][name] = cv_scores
+        results['predictions'][name] = test_pred
+        results['probabilities'][name] = y_proba
+        
+        # Print results
+        print(f"  Train Accuracy: {train_acc:.3f}")
+        print(f"  Test Accuracy:  {test_acc:.3f}")
+        print(f"  CV Accuracy:    {cv_scores.mean():.3f} (+/- {cv_scores.std() * 2:.3f})")
+        
+        # Print confusion matrix
+        cm = confusion_matrix(y_test, test_pred)
+        print(f"  Confusion Matrix:")
+        print(f"    {cm[0,0]:2d}  {cm[0,1]:2d}")
+        print(f"    {cm[1,0]:2d}  {cm[1,1]:2d}")
+    
+    return results
+
+
+def visualize_classification_results(results):
+    """
+    Create visualizations of classification results.
+    
+    Parameters:
+    -----------
+    results : dict
+        Results dictionary from train_and_evaluate_classifiers
+    """
+    print("\n" + "="*60)
+    print("CREATING CLASSIFICATION VISUALIZATIONS")
+    print("="*60)
+    
+    # Create figure with subplots
+    fig = plt.figure(figsize=(16, 12))
+    
+    model_names = list(results['test_scores'].keys())
+    n_models = len(model_names)
+    
+    # 1. Model comparison bar chart
+    ax1 = plt.subplot(2, 3, 1)
+    train_scores = [results['train_scores'][name] for name in model_names]
+    test_scores = [results['test_scores'][name] for name in model_names]
+    cv_means = [results['cv_scores'][name].mean() for name in model_names]
+    cv_stds = [results['cv_scores'][name].std() for name in model_names]
+    
+    x_pos = np.arange(n_models)
+    width = 0.25
+    
+    ax1.bar(x_pos - width, train_scores, width, label='Train', alpha=0.8, color='skyblue')
+    ax1.bar(x_pos, test_scores, width, label='Test', alpha=0.8, color='lightcoral')
+    ax1.bar(x_pos + width, cv_means, width, label='CV Mean', alpha=0.8, color='lightgreen', 
+            yerr=cv_stds, capsize=5)
+    
+    ax1.set_xlabel('Model')
+    ax1.set_ylabel('Accuracy')
+    ax1.set_title('Model Performance Comparison')
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels(model_names, rotation=45, ha='right')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3, axis='y')
+    ax1.set_ylim([0, 1.1])
+    
+    # 2-5. Confusion matrices for all models
+    confusion_matrix_positions = [(2, 3, 2), (2, 3, 3), (2, 3, 5), (2, 3, 6)]
+    for idx, name in enumerate(model_names):
+        if idx < len(confusion_matrix_positions):
+            nrows, ncols, pos = confusion_matrix_positions[idx]
+            ax = plt.subplot(nrows, ncols, pos)
+            
+            y_test = results['y_test']
+            y_pred = results['predictions'][name]
+            cm = confusion_matrix(y_test, y_pred)
+            
+            im = ax.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+            ax.figure.colorbar(im, ax=ax)
+            ax.set(xticks=np.arange(cm.shape[1]),
+                   yticks=np.arange(cm.shape[0]),
+                   xticklabels=['Rest', 'Motor Imagery'],
+                   yticklabels=['Rest', 'Motor Imagery'],
+                   title=f'{name}\nAcc: {results["test_scores"][name]:.3f}',
+                   ylabel='True label',
+                   xlabel='Predicted label')
+            
+            # Add text annotations
+            thresh = cm.max() / 2.
+            for i in range(cm.shape[0]):
+                for j in range(cm.shape[1]):
+                    ax.text(j, i, format(cm[i, j], 'd'),
+                           ha="center", va="center",
+                           color="white" if cm[i, j] > thresh else "black")
+    
+    plt.tight_layout()
+    plt.suptitle('Classification Results Dashboard', y=1.02, fontsize=16, fontweight='bold')
+    
+    # Save or show
+    if save_plots:
+        fig.savefig('classification_results.png', dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        print("Saved: classification_results.png")
+    else:
+        plt.show()
+    
+    # ROC curves (if probabilities available)
+    fig2, ax = plt.subplots(figsize=(10, 8))
+    
+    for name in model_names:
+        y_proba = results['probabilities'][name]
+        if y_proba is not None:
+            y_test = results['y_test']
+            fpr, tpr, _ = roc_curve(y_test, y_proba)
+            auc = roc_auc_score(y_test, y_proba)
+            ax.plot(fpr, tpr, label=f'{name} (AUC = {auc:.3f})', linewidth=2)
+    
+    ax.plot([0, 1], [0, 1], 'k--', label='Random Classifier', linewidth=1)
+    ax.set_xlabel('False Positive Rate', fontsize=12)
+    ax.set_ylabel('True Positive Rate', fontsize=12)
+    ax.set_title('ROC Curves', fontsize=14, fontweight='bold')
+    ax.legend(loc='lower right', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    
+    if save_plots:
+        fig2.savefig('roc_curves.png', dpi=150, bbox_inches='tight')
+        plt.close(fig2)
+        print("Saved: roc_curves.png")
+    else:
+        plt.show()
+
+
+def print_classification_report(results):
+    """
+    Print detailed classification reports for all models.
+    
+    Parameters:
+    -----------
+    results : dict
+        Results dictionary from train_and_evaluate_classifiers
+    """
+    print("\n" + "="*60)
+    print("DETAILED CLASSIFICATION REPORTS")
+    print("="*60)
+    
+    y_test = results['y_test']
+    
+    for name in results['models'].keys():
+        print(f"\n{name}:")
+        print("-" * 60)
+        y_pred = results['predictions'][name]
+        print(classification_report(y_test, y_pred, 
+                                   target_names=['Rest', 'Motor Imagery']))
+
+
+# Train and evaluate classifiers
+if X_features is not None:
+    # Train and evaluate
+    ml_results = train_and_evaluate_classifiers(X_features, y, test_size=0.3, random_state=42)
+    
+    # Print detailed reports
+    print_classification_report(ml_results)
+    
+    # Visualize results
+    visualize_classification_results(ml_results)
+    
+    # Print best model
+    best_model = max(ml_results['test_scores'], key=ml_results['test_scores'].get)
+    best_score = ml_results['test_scores'][best_model]
+    print(f"\n{'='*60}")
+    print(f"BEST MODEL: {best_model}")
+    print(f"Test Accuracy: {best_score:.3f}")
+    print(f"{'='*60}")
 
 
 ####TROUBLESHOOTING#######
