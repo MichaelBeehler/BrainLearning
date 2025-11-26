@@ -1,0 +1,31 @@
+Subjects performed different motor/imagery tasks while 64-channel EEG were recorded using the BCI2000 system (http://www.bci2000.org). Each subject performed 14 experimental runs: two one-minute baseline runs (one with eyes open, one with eyes closed), and three two-minute runs of each of the four following tasks:
+A target appears on either the left or the right side of the screen. The subject opens and closes the corresponding fist until the target disappears. Then the subject relaxes.
+A target appears on either the left or the right side of the screen. The subject imagines opening and closing the corresponding fist until the target disappears. Then the subject relaxes.
+A target appears on either the top or the bottom of the screen. The subject opens and closes either both fists (if the target is on top) or both feet (if the target is on the bottom) until the target disappears. Then the subject relaxes.
+A target appears on either the top or the bottom of the screen. The subject imagines opening and closing either both fists (if the target is on top) or both feet (if the target is on the bottom) until the target disappears. Then the subject relaxes.
+
+
+Baseline, eyes open
+Baseline, eyes closed
+Task 1 (open and close left or right fist)
+Task 2 (imagine opening and closing left or right fist)
+Task 3 (open and close both fists or both feet)
+Task 4 (imagine opening and closing both fists or both feet)
+Task 1
+Task 2
+Task 3
+Task 4
+Task 1
+Task 2
+Task 3
+Task 4
+
+The data are provided here in EDF+ format (containing 64 EEG signals, each sampled at 160 samples per second, and an annotation channel). 
+Each annotation includes one of three codes (T0, T1, or T2):
+T0 corresponds to rest
+T1 corresponds to onset of motion (real or imagined) of
+the left fist (in runs 3, 4, 7, 8, 11, and 12)
+both fists (in runs 5, 6, 9, 10, 13, and 14)
+T2 corresponds to onset of motion (real or imagined) of
+the right fist (in runs 3, 4, 7, 8, 11, and 12)
+both feet (in runs 5, 6, 9, 10, 13, and 14)

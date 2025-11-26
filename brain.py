@@ -1,7 +1,7 @@
 import matplotlib
-# Use Agg backend for non-interactive plotting (saves to files)
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+
+# matplotlib.use("QtAgg")
+import matplotlib.pyplot as plt  # or "Qt5Agg"
 import mne
 import numpy as np
 from mne.decoding import CSP
@@ -10,11 +10,7 @@ from mne.time_frequency import psd_array_welch
 troubleshoot_epochs = False
 save_plots = True  # Set to False if you want interactive plots (requires GUI backend)
 
-# Try to set browser backend, but fallback gracefully if not available
-try:
-    mne.viz.set_browser_backend("matplotlib")  # Use matplotlib backend instead of qt
-except:
-    print("Note: Using default MNE browser backend")
+#mne.viz.set_browser_backend("qt")
 raw = mne.io.read_raw_edf("S001R03.edf", preload=True)
 
 print(raw.info)
