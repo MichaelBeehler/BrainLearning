@@ -5,6 +5,7 @@
 # Copyright the MNE-Python contributors.
 #############################################################################
 
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
