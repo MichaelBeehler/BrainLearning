@@ -34,7 +34,7 @@ mne.set_config('MNE_DATA', r'c:\Users\Michael\Desktop\EEGData')
 # Filter out Evoked Responses
 tmin, tmax = -1.0, 4.0
 
-subjects = 1
+subjects = 2
 
 # Using Sliding Windows will allow us to get more samples out of our data
 def sliding_window(data, labels, window_size=160, step_size=40):
