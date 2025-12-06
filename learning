@@ -12,4 +12,30 @@ from mne.decoding import CSP, get_spatial_filter_from_estimator
 from mne.io import concatenate_raws, read_raw_edf
 from mne.datasets import eegbci
 from EEGModels import EEGNet
+# EEGNet-specific imports
+from EEGModels import EEGNet
+from keras import utils as np_utils
+from keras.callbacks import ModelCheckpoint
+from keras import backend as K
+
+# PyRiemann imports
+from pyriemann.estimation import XdawnCovariances
+from pyriemann.tangentspace import TangentSpace
+from pyriemann.utils.viz import plot_confusion_matrix
+from sklearn.pipeline import make_pipeline
+from sklearn.linear_model import LogisticRegression
+
+# For Users: Set the path to the location of the files on your local machine
+mne.set_config('MNE_DATA', r'c:\Users\Michael\Desktop\EEGData')
+
+# Read the data
+
+# Filter out Evoked Responses
+tmin, tmax = -1.0, 4.0
+
+subjects = 1
+
+
+# There are the runs that correspond to hand vs foot movement
+runs = [6, 10, 14]
 
