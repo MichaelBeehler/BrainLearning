@@ -3,6 +3,8 @@ import numpy as np
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import ShuffleSplit, cross_val_score
 from sklearn.pipeline import Pipeline
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+from sklearn.model_selection import train_test_split
 
 import mne
 from mne import Epochs, pick_types
@@ -11,7 +13,7 @@ from mne.datasets import eegbci
 from mne.decoding import CSP, get_spatial_filter_from_estimator
 from mne.io import concatenate_raws, read_raw_edf
 from mne.datasets import eegbci
-from EEGModels import EEGNet
+
 # EEGNet-specific imports
 from EEGModels import EEGNet
 from keras import utils as np_utils
@@ -21,7 +23,6 @@ from keras import backend as K
 # PyRiemann imports
 from pyriemann.estimation import XdawnCovariances
 from pyriemann.tangentspace import TangentSpace
-from pyriemann.utils.viz import plot_confusion_matrix
 from sklearn.pipeline import make_pipeline
 from sklearn.linear_model import LogisticRegression
 
@@ -39,3 +40,88 @@ subjects = 1
 # There are the runs that correspond to hand vs foot movement
 runs = [6, 10, 14]
 
+raw_fnames = eegbci.load_data(subjects, runs)
+
+raw = concatenate_raws([read_raw_edf(f, preload=True) for f in raw_fnames])
+eegbci.standardize(raw)  # set channel names
+montage = make_standard_montage("standard_1005")
+raw.set_montage(montage)
+raw.annotations.rename(dict(T1="hands", T2="feet"))  # as documented on PhysioNet
+raw.set_eeg_reference(projection=True)
+
+# Apply band-pass filter
+raw.filter(7.0, 30.0, fir_design="firwin", skip_by_annotation="edge")
+
+# EEGNet expects 128Hz data. Our data is currently 160Hz. We need to change it to fit
+raw.resample(128)
+
+picks = pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False, exclude="bads")
+
+# Read epochs (train will be done only between 1 and 2s)
+# Testing will be done with a running classifier
+epochs = Epochs(
+    raw,
+    event_id=["hands", "feet"],
+    tmin=tmin,
+    tmax=tmax,
+    proj=True,
+    picks=picks,
+    baseline=None,
+    preload=True,
+)
+epochs_train = epochs.copy().crop(tmin=1.0, tmax=2.0)
+labels = epochs.events[:, -1] - 2
+
+### 
+X = epochs.get_data()*1000
+y = labels
+
+kernels, chans, samples = 1, 64, X.shape[2]
+
+# first split train+valid vs test
+X_trainval, X_test, y_trainval, y_test = train_test_split(
+    X, y, test_size=0.25, shuffle=True, stratify=y
+)
+
+# then split train vs valid
+X_train, X_validate, y_train, y_validate = train_test_split(
+    X_trainval, y_trainval, test_size=1/3, shuffle=True, stratify=y_trainval
+)
+
+# convert labels to one-hot encodings.
+y_train = np_utils.to_categorical(y_train)
+y_validate = np_utils.to_categorical(y_validate)
+y_test = np_utils.to_categorical(y_test)
+
+
+print("Unique labels:", np.unique(y))
+X_train = X_train.reshape(X_train.shape[0], chans, samples, kernels)
+X_validate = X_validate.reshape(X_validate.shape[0], chans, samples, kernels)
+X_test = X_test.reshape(X_test.shape[0], chans, samples, kernels)
+
+print ('X_train shape', X_train.shape)
+print (X_train.shape[0], "train samples")
+print (X_test.shape[0], "test samples") 
+
+model = EEGNet (nb_classes=2, Chans=chans, Samples=samples, dropoutRate=0.5, kernLength=32, 
+                F1=8, D=2, F2=16, dropoutType='Dropout')
+
+model.compile(loss='categorical_crossentropy', optimizer='Adam', metrics=['accuracy'])
+
+numParams = model.count_params()
+
+checkpointer = ModelCheckpoint(filepath='/tmp/checkpoint.h5', verbose=1, save_best_only=True)
+
+
+class_weights = {0:1, 1:1}
+
+fittedModel = model.fit(X_train, y_train, batch_size=16, epochs=300, verbose=2, validation_data=(X_validate, y_validate), callbacks=[checkpointer],
+                        class_weight=class_weights)
+
+model.load_weights('/tmp/checkpoint.h5')
+
+probs = model.predict(X_test)
+preds = probs.argmax(axis = -1)
+acc = np.mean(preds == y_test.argmax(axis=-1))
+
+print (f"Classification Accuracy: {acc:.2f}")
