@@ -1,24 +1,19 @@
-#############################################################################
-# Note: This code was adopted from: https://mne.tools/stable/auto_examples/decoding/decoding_csp_eeg.html
-# Authors: Martin Billinger <martin.billinger@tugraz.at>
-# License: BSD-3-Clause
-# Copyright the MNE-Python contributors.
-#############################################################################
-
-
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import ShuffleSplit, cross_val_score
 from sklearn.pipeline import Pipeline
 
+import mne
 from mne import Epochs, pick_types
 from mne.channels import make_standard_montage
 from mne.datasets import eegbci
 from mne.decoding import CSP, get_spatial_filter_from_estimator
 from mne.io import concatenate_raws, read_raw_edf
+from mne.datasets import eegbci
 
-print(__doc__)
+# Set the path to the location of the files on your local machine
+mne.set_config('MNE_DATA', r'c:\Users\Michael\Desktop\EEGData')
 
 # #############################################################################
 # # Set parameters and read data
@@ -26,10 +21,11 @@ print(__doc__)
 # avoid classification of evoked responses by using epochs that start 1s after
 # cue onset.
 tmin, tmax = -1.0, 4.0
-subjects = 1
+subjects = 105
 runs = [6, 10, 14]  # motor imagery: hands vs feet
 
 raw_fnames = eegbci.load_data(subjects, runs)
+
 raw = concatenate_raws([read_raw_edf(f, preload=True) for f in raw_fnames])
 eegbci.standardize(raw)  # set channel names
 montage = make_standard_montage("standard_1005")
