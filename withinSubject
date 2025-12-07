@@ -1,3 +1,8 @@
+####################################################################
+# The Goal of this Model is to create a "within-subject" AI that 
+# predicts what movement a person is imagining based on EEG Data.
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
@@ -34,7 +39,7 @@ mne.set_config('MNE_DATA', r'c:\Users\Michael\Desktop\EEGData')
 # Filter out Evoked Responses
 tmin, tmax = -1.0, 4.0
 
-subjects = 2
+subjects = 108
 
 # Using Sliding Windows will allow us to get more samples out of our data
 def sliding_window(data, labels, window_size=160, step_size=40):
@@ -147,7 +152,7 @@ checkpointer = ModelCheckpoint(filepath='/tmp/checkpoint.h5', verbose=1, save_be
 
 class_weights = {0:1, 1:1}
 
-fittedModel = model.fit(X_train, y_train, batch_size=16, epochs=35, verbose=2, validation_data=(X_validate, y_validate), callbacks=[checkpointer],
+fittedModel = model.fit(X_train, y_train, batch_size=16, epochs=100, verbose=2, validation_data=(X_validate, y_validate), callbacks=[checkpointer],
                         class_weight=class_weights)
 
 model.load_weights('/tmp/checkpoint.h5')
@@ -155,5 +160,9 @@ model.load_weights('/tmp/checkpoint.h5')
 probs = model.predict(X_test)
 preds = probs.argmax(axis = -1)
 acc = np.mean(preds == y_test.argmax(axis=-1))
+
+print ("Probs:", probs)
+print ("Preds:", preds)
+print ("True:", y_test)
 
 print (f"Classification Accuracy: {acc:.2f}")
