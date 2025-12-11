@@ -1,10 +1,4 @@
 from keras.models import load_model
-#####################################################################################
-# Clean within-subject EEGNet pipeline with sliding windows and robust event handling.
-# By: Michael Beehler, Javon Bell, Endi Troqe
-# Last Edited: 12/11/2025 (By Michael Beehler)
-#####################################################################################
-
 import numpy as np
 import matplotlib.pyplot as plt
 import mne
@@ -13,9 +7,7 @@ from mne.channels import make_standard_montage
 from mne.datasets import eegbci
 from mne.io import concatenate_raws, read_raw_edf
 
-from keras import utils as np_utils
-from keras.callbacks import ModelCheckpoint
-from EEGModels import EEGNet 
+from keras import utils as np_utils 
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -40,7 +32,7 @@ CHECKPOINT_PATH = os.path.join(BASE_DIR, "checkpoint.h5")
 # Apply path to MNE
 mne.set_config("MNE_DATA", MNE_DATA_PATH)
 
-SUBJECT = 107                      # single subject for within-subject model
+SUBJECT = 100                      # single subject for within-subject model
 RUNS = [6, 10, 14]               # motor imagery hands vs feet (adjust if you want other tasks)
 TMIN, TMAX = 0.0, 4.0           # epoch window (kept large; training windows will be cropped)
 TRAIN_WINDOW_SIZE = 160          # samples per sliding window (EEGNet Samples parameter)
