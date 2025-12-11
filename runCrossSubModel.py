@@ -1,3 +1,4 @@
+from keras.models import load_model
 #####################################################################################
 # Clean within-subject EEGNet pipeline with sliding windows and robust event handling.
 # By: Michael Beehler, Javon Bell, Endi Troqe
@@ -19,6 +20,9 @@ from EEGModels import EEGNet
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import os
+
+# Load the previously trained model
+model = load_model("crossSub_model.h5")
 
 # -------------------------
 # USER CONFIG
@@ -193,37 +197,8 @@ samples = X_train.shape[2]
 print("EEGNet input dims -> chans:", chans, "samples:", samples)
 
 # -------------------------
-# Build and compile EEGNet
-# -------------------------
-model = EEGNet(nb_classes=nb_classes,
-               Chans=chans,
-               Samples=samples,
-               dropoutRate=0.5,
-               kernLength=32,
-               F1=8, D=2, F2=16,
-               dropoutType='Dropout')
-
-model.compile(loss='categorical_crossentropy', optimizer='Adam', metrics=['accuracy'])
-print("Model params:", model.count_params())
-
-# callbacks
-checkpointer = ModelCheckpoint(CHECKPOINT_PATH, verbose=1, save_best_only=True)
-
-# -------------------------
-# Fit
-# -------------------------
-history = model.fit(X_train, y_train_hot,
-                    batch_size=BATCH_SIZE,
-                    epochs=EPOCHS,
-                    verbose=2,
-                    validation_data=(X_val, y_val_hot),
-                    callbacks=[checkpointer])
-
-# -------------------------
 # Evaluate on test set
 # -------------------------
-# Load the best weights, make predictions
-model.load_weights(CHECKPOINT_PATH)
 probs = model.predict(X_test)
 preds = probs.argmax(axis=1)
 y_true = y_test

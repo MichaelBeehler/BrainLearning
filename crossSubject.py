@@ -3,7 +3,7 @@ Cross-subject EEGNet training script (leave-one-subject-out).
 - Trains on SUBJECTS excluding TEST_SUBJECT and evaluates on TEST_SUBJECT
 - Robust event mapping per-subject
 - Sliding windows to create many training samples
-- Uses EEGNet from your EEGModels module (assumed to be Keras)
+- Uses EEGNet
 """
 
 import os
@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from keras import utils as np_utils
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from EEGModels import EEGNet  # your local EEGNet implementation
+from EEGModels import EEGNet 
 import matplotlib.pyplot as plt
 
 # -----------------------
