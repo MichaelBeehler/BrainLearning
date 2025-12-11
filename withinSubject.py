@@ -1,9 +1,9 @@
-"""
-Clean within-subject EEGNet pipeline with sliding windows and robust event handling.
-Replace paths and tweak hyperparams (window_size, step_size, epochs, etc.) as needed.
-"""
+#####################################################################################
+# Clean within-subject EEGNet pipeline with sliding windows and robust event handling.
+# By: Michael Beehler, Javon Bell, Endi Troqe
+# Last Edited: 12/11/2025 (By Michael Beehler)
+#####################################################################################
 
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import mne
@@ -13,8 +13,8 @@ from mne.datasets import eegbci
 from mne.io import concatenate_raws, read_raw_edf
 
 from keras import utils as np_utils
-from keras.callbacks import ModelCheckpoint, EarlyStopping
-from EEGModels import EEGNet  # your EEGNet implementation
+from keras.callbacks import ModelCheckpoint
+from EEGModels import EEGNet 
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -22,13 +22,13 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 # -------------------------
 # USER CONFIG
 # -------------------------
-MNE_DATA_PATH = r'c:\Users\Michael\Desktop\EEGData'  # where your MNE-eegbci-data lives
-SUBJECT = 108                      # single subject for within-subject model
+MNE_DATA_PATH = r'c:\Users\Michael\Desktop\EEGData'
+SUBJECT = 10                      # single subject for within-subject model
 RUNS = [6, 10, 14]               # motor imagery hands vs feet (adjust if you want other tasks)
-TMIN, TMAX = -1.0, 4.0           # epoch window (kept large; training windows will be cropped)
+TMIN, TMAX = 0.0, 4.0           # epoch window (kept large; training windows will be cropped)
 TRAIN_WINDOW_SIZE = 160          # samples per sliding window (EEGNet Samples parameter)
 STEP_SIZE = 40                   # sliding window step (overlap = window_size - step_size)
-RESAMPLE_SFREQ = 128             # EEGNet expects 128 Hz; resample accordingly
+RESAMPLE_SFREQ = 128             # EEGNet expects 128 Hz
 BATCH_SIZE = 16
 EPOCHS = 100
 CHECKPOINT_PATH = "/tmp/checkpoint.h5"
@@ -110,7 +110,6 @@ print("Using event_id mapping:", event_id)
 epochs = Epochs(raw, event_id=event_id, tmin=TMIN, tmax=TMAX,
                 proj=True, picks=picks, baseline=None, preload=True)
 
-# caution: epochs.events[:, -1] will be the integer event codes (e.g., 1/2 or 2/3 ...)
 print("Number of epochs:", len(epochs))
 print("Event codes present (unique):", np.unique(epochs.events[:, -1]))
 
@@ -119,11 +118,7 @@ code_to_label = { event_id['hands']: 0, event_id['feet']: 1 }
 labels = np.array([code_to_label[e] for e in epochs.events[:, -1]])
 print("Label distribution (counts):", np.bincount(labels))
 
-# training epochs (you previously used 1.0-2.0 for training; here we still keep full epoch array
-# but sliding windows will choose portions; if you want to restrict to 1-2s, set crop)
-# If you want to train only on 1-2s segments, uncomment:
-# epochs_train = epochs.copy().crop(tmin=1.0, tmax=2.0)
-# X_full = epochs_train.get_data()
+# training epochs
 X_full = epochs.get_data()   # shape: (n_trials, n_channels, n_samples)
 print("Epoch data shape (trials, chans, samples):", X_full.shape)
 
@@ -171,7 +166,7 @@ print("Class balance: train", np.bincount(y_train), "val", np.bincount(y_val), "
 # -------------------------
 # Prepare labels for EEGNet
 # -------------------------
-# ensure labels are 0..nb_classes-1
+# labels are 0..nb_classes-1
 nb_classes = 2
 assert set(np.unique(y_train)).issubset({0,1})
 
@@ -200,7 +195,6 @@ print("Model params:", model.count_params())
 
 # callbacks
 checkpointer = ModelCheckpoint(CHECKPOINT_PATH, verbose=1, save_best_only=True)
-earlystop = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
 
 # -------------------------
 # Fit
@@ -210,12 +204,13 @@ history = model.fit(X_train, y_train_hot,
                     epochs=EPOCHS,
                     verbose=2,
                     validation_data=(X_val, y_val_hot),
-                    callbacks=[checkpointer, earlystop])
+                    callbacks=[checkpointer])
 
 # -------------------------
 # Evaluate on test set
 # -------------------------
-model.load_weights(CHECKPOINT_PATH)  # load best
+# Load the best weights, make predictions
+model.load_weights(CHECKPOINT_PATH)
 probs = model.predict(X_test)
 preds = probs.argmax(axis=1)
 y_true = y_test
@@ -223,22 +218,8 @@ y_true = y_test
 test_acc = (preds == y_true).mean()
 print(f"Test accuracy: {test_acc:.3f}")
 
-# confusion matrix
+# Plot and display a confusion matrix
 cm = confusion_matrix(y_true, preds, labels=[0,1])
 disp = ConfusionMatrixDisplay(cm, display_labels=['hands','feet'])
 disp.plot()
 plt.show()
-
-# -------------------------
-# Sanity checks to run manually:
-# 1) print annot_map at top and ensure mapping looks like what you expect.
-# 2) check the class balance prints above -- huge imbalance indicates bug.
-# 3) check shapes: X_train shape should be (N, chans, samples, 1); samples should equal TRAIN_WINDOW_SIZE.
-# 4) if test acc is suspiciously high: check for data leakage (windows from same trial in train and test).
-#    If you want a stricter within-subject test, split trials (not windows) into train/test so windows from same trial
-#    do not appear both in train and test.
-#
-# Optional stricter split (prevent same-trial leakage):
-# - split epochs indices into train/test, then create windows only from those partitions.
-# -------------------------
-
