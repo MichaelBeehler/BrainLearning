@@ -18,11 +18,24 @@ from EEGModels import EEGNet
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import os
 
 # -------------------------
 # USER CONFIG
 # -------------------------
-MNE_DATA_PATH = r'c:\Users\Michael\Desktop\EEGData'
+# Base project folder (where this script lives)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Where to store/download the EEG data
+MNE_DATA_PATH = os.getenv("MNE_DATA_PATH",
+                          os.path.join(BASE_DIR, "MNE_DATA"))
+
+# Where to save model checkpoints
+CHECKPOINT_PATH = os.path.join(BASE_DIR, "checkpoint.h5")
+
+# Apply path to MNE
+mne.set_config("MNE_DATA", MNE_DATA_PATH)
+
 SUBJECT = 10                      # single subject for within-subject model
 RUNS = [6, 10, 14]               # motor imagery hands vs feet (adjust if you want other tasks)
 TMIN, TMAX = 0.0, 4.0           # epoch window (kept large; training windows will be cropped)
@@ -31,7 +44,7 @@ STEP_SIZE = 40                   # sliding window step (overlap = window_size - 
 RESAMPLE_SFREQ = 128             # EEGNet expects 128 Hz
 BATCH_SIZE = 16
 EPOCHS = 100
-CHECKPOINT_PATH = "/tmp/checkpoint.h5"
+#CHECKPOINT_PATH = "/tmp/checkpoint.h5"
 SEED = 42
 np.random.seed(SEED)
 

@@ -23,8 +23,21 @@ import matplotlib.pyplot as plt
 # -----------------------
 # USER CONFIG
 # -----------------------
-MNE_DATA_PATH = r'c:\Users\Michael\Desktop\EEGData'  # where MNE-eegbci-data lives
-SUBJECTS = list(range(1, 5))       # subjects to include (1..109)
+
+# Base project folder (where this script lives)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Where to store/download the EEG data
+MNE_DATA_PATH = os.getenv("MNE_DATA_PATH",
+                          os.path.join(BASE_DIR, "MNE_DATA"))
+
+# Where to save model checkpoints
+CHECKPOINT_PATH = os.path.join(BASE_DIR, "eegnet_best.h5")
+
+# Apply path to MNE
+mne.set_config("MNE_DATA", MNE_DATA_PATH)
+
+SUBJECTS = list(range(1, 50))       # subjects to include (1..109)
 TEST_SUBJECT = 4                   # leave this subject out for testing (cross-subject eval)
 RUNS = [6, 10, 14]                   # motor imagery hands vs feet (adjust if needed)
 TMIN, TMAX = 0.0, 4.0                # full epoch window (we'll extract sliding windows from this)
@@ -33,7 +46,7 @@ WINDOW_SIZE = 160                    # samples in sliding window (EEGNet Samples
 STEP_SIZE = 40                       # sliding window step (overlap = WINDOW_SIZE - STEP_SIZE)
 BATCH_SIZE = 32
 EPOCHS = 60
-CHECKPOINT_PATH = "/tmp/eegnet_best.h5"
+#CHECKPOINT_PATH = "/tmp/eegnet_best.h5"
 SEED = 42
 np.random.seed(SEED)
 
@@ -138,7 +151,7 @@ for subj in SUBJECTS:
     labels = np.array([code_to_label[c] for c in epoch_codes])
     print("  label counts:", np.bincount(labels))
 
-    X_epochs = epochs.get_data() * 1000.0  # scale to microvolts if desired (optional)
+    X_epochs = epochs.get_data() * 1000.0  
     Xw, yw = sliding_windows_from_epochs(X_epochs, labels, window_size=WINDOW_SIZE, step_size=STEP_SIZE)
     print(f"  produced windows: {Xw.shape}, classes: {np.bincount(yw)}")
 
@@ -197,7 +210,6 @@ print("Model params:", model.count_params())
 
 # callbacks
 checkpointer = ModelCheckpoint(CHECKPOINT_PATH, verbose=1, save_best_only=True)
-earlystop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
 # small validation split from train for early stopping
 X_tr, X_val, y_tr, y_val = train_test_split(X_train, y_train_hot, test_size=0.15, random_state=SEED, stratify=y_train)
@@ -206,7 +218,7 @@ X_tr, X_val, y_tr, y_val = train_test_split(X_train, y_train_hot, test_size=0.15
 # Fit
 # -----------------------
 history = model.fit(X_tr, y_tr, batch_size=BATCH_SIZE, epochs=EPOCHS, verbose=2,
-                    validation_data=(X_val, y_val), callbacks=[checkpointer, earlystop])
+                    validation_data=(X_val, y_val), callbacks=[checkpointer])
 
 # -----------------------
 # Evaluate on test subject
@@ -215,6 +227,9 @@ model.load_weights(CHECKPOINT_PATH)
 probs = model.predict(test_X)
 preds = probs.argmax(axis=1)
 acc = (preds == test_y).mean()
+
+model.save("crossSub_model.h5")
+
 print(f"\nCross-subject test accuracy on subject {TEST_SUBJECT}: {acc:.3f}")
 print("Confusion matrix (test):")
 cm = confusion_matrix(test_y, preds, labels=[0,1])
