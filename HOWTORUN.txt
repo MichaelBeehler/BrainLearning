@@ -1,0 +1,10 @@
+To run the within subject, simply run withinSubject.py in your IDE. The 
+program should automatically download the subject from the PhysioNet dataset, 
+and run through the training
+
+For cross subject, a model has been pre-trained for the sake of time.
+To run on this pre-trained model, simply run "runCrossSubModel.py", and the 
+program will download the necessary data from the PhysioNet database, then train.
+
+To train a new cross subject model, run "crossSubject.py". Note that this may take a long time,
+as it needs to both download the dataset (which is around 3GB) and then train.
